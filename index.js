@@ -4,21 +4,17 @@ const inquirer = require("inquirer");
 var colors = require("colors");
 const shell = require("shelljs");
 var fs = require("fs");
-var minecraftsaveslocation = `~/AppData/Roaming/.minecraft/saves`
 
-function createDataPack(name, description, version, location) {
+var startPath = process.cwd();
+
+var minecraftsaveslocation = process.platform == 'win32' ? `~/AppData/Roaming/.minecraft/saves` : process.platform == 'darwin' ? `~/Library/Application Support/minecraft/saves` : `~/.minecraft`
+
+function createDataPack(name, desc, ver, location) {
     // Generate data for files
-    var newver;
-    try {
-        newver = JSON.parse(version)
-    } catch (error) {
-        console.log(`! Version value entered not a number, exiting...`.red.bold);
-        process.exit()
-    }
     var file_pack_mcmeta = {
         "pack": {
-            "pack_format": newver,
-            "description": description
+            "pack_format": ver,
+            "description": desc
         }
     }
     var file_gameloop_mcfunction = `## This file is run every game tick (20 times a second)\n\n# Core loading\nfunction ${name}:core\n\n# Add-ons`
@@ -26,120 +22,118 @@ function createDataPack(name, description, version, location) {
         "values": [`${name}:gameloop`]
     }
 
-    var datapckdir = `${minecraftsaveslocation}/${location}/datapacks`
+    var file_pack_mcmeta = JSON.stringify(file_pack_mcmeta, null, '    ')
+    var file_tick_json = JSON.stringify(file_tick_json, null, '    ')
+
+    var datapackdir = location;
 
     // File generating...
     console.log(`\nGenerating files...`.green.bold);
-    shell.mkdir('-p', `${datapckdir}/${name}/data/${name}/functions/add-ons`);
-    shell.touch(`${datapckdir}/${name}/pack.mcmeta`);
-    shell.mkdir(`${datapckdir}/${name}/data/${name}/functions/required`);
-    shell.touch(`${datapckdir}/${name}/data/${name}/functions/core.mcfunction`);
-    shell.touch(`${datapckdir}/${name}/data/${name}/functions/gameloop.mcfunction`);
-    shell.mkdir('-p', `${datapckdir}/${name}/data/minecraft/tags/functions`);
-    shell.touch(`${datapckdir}/${name}/data/minecraft/tags/functions/tick.json`);
+    shell.mkdir('-p', `${datapackdir}/${name}/data/${name}/functions/add-ons`);
+    shell.touch(`${datapackdir}/${name}/pack.mcmeta`);
+    shell.mkdir(`${datapackdir}/${name}/data/${name}/functions/required`);
+    shell.touch(`${datapackdir}/${name}/data/${name}/functions/core.mcfunction`);
+    shell.touch(`${datapackdir}/${name}/data/${name}/functions/gameloop.mcfunction`);
+    shell.mkdir('-p', `${datapackdir}/${name}/data/minecraft/tags/functions`);
+    shell.touch(`${datapackdir}/${name}/data/minecraft/tags/functions/tick.json`);
 
     // File writing
     console.log(`Writing data to files...\n`.green.bold);
-    shell.cd(datapckdir)
-    fs.writeFileSync(`./${name}/pack.mcmeta`, JSON.stringify(file_pack_mcmeta, null, `    `));
+    shell.cd(datapackdir)
+    fs.writeFileSync(`./${name}/pack.mcmeta`, file_pack_mcmeta);
     fs.writeFileSync(`./${name}/data/${name}/functions/gameloop.mcfunction`, file_gameloop_mcfunction);
-    fs.writeFileSync(`./${name}/data/minecraft/tags/functions/tick.json`, JSON.stringify(file_tick_json, null, `    `));
+    fs.writeFileSync(`./${name}/data/minecraft/tags/functions/tick.json`, file_tick_json);
 
     // Done message
     console.log(` Done!\n`.black.bgGreen.bold)
 }
 
-const askQuestions = () => {
-    const questions = [{
-            name: "DATAPACKNAME",
-            type: "input",
-            message: "What do you want to call this datapack?"
-        },
-        {
-            name: "DATAPACKDESC",
-            type: "input",
-            message: "What do you want the description to be?"
-        },
-        {
-            name: "DATAPACKVERN",
-            type: "input",
-            message: "What do you want the datapack version to be? (This has to be a number)"
-        },
-        {
-            name: "LOCATIONTYPE",
-            type: "list",
-            message: "Create datapack in local directory or choose from your saves (windows only)",
-            choices: ["Local directory", "Choose from my saves"]
-        }
-    ];
-    return inquirer.prompt(questions);
-};
 
-const localPath = () => {
-    var saveslist = shell.ls(minecraftsaveslocation);
-    for (let i = 0; i < saveslist.length; i++) {
-        if (saveslist[i].match(/.*\..*/)) {
-            saveslist.splice(i, 1);
-        }
-    }
-    const questions = [{
-        name: "LOCATION",
-        type: "list",
-        message: "In witch save do you want to create the datapack?",
-        choices: saveslist
-    }]
-    return inquirer.prompt(questions);
-}
-
-const sure = (name, description, version, path) => {
-    shell.cd(`${minecraftsaveslocation}/${path}`)
-    const questions = [{
-        name: "SURE",
-        type: "list",
-        message: `\n\n  Please review these options:\n\nPack name: ${name}\nPack description: ${description}\nPack version: ${version}\nPack directory: ${shell.pwd()}/datapacks/${name}\n\n  Is this correct?`,
-        choices: ["Yes", "No"]
-    }];
-    return inquirer.prompt(questions);
-};
-
-const run = async () => {
-    // Welcome message
-    console.log("Hi there, welcome to Loekaars' datapack generator!\nTo use this generator, just type in the required information when prompted!\n\n".green);
-
-    // Questions
-    var answers = await askQuestions();
-    var {
-        DATAPACKNAME,
-        DATAPACKDESC,
-        DATAPACKVERN,
-        LOCATIONTYPE
-    } = answers;
+// ask questions
+async function askQuestions() {
+    var __1;
+    var __2;
+    var __3;
+    var name;
+    var desc;
+    var version;
     var location;
-    if(answers.LOCATIONTYPE == "Local directory"){
-        location = process.cwd();
-    } else {
-        var location = await localPath();
-        var {
-            LOCATION
-        } = location;
+    __1 = await inquirer.prompt(
+        [{
+                name: "name",
+                type: "input",
+                message: "What do you want to call this datapack?"
+            },
+            {
+                name: "desc",
+                type: "input",
+                message: "What do you want the description to be?"
+            },
+            {
+                name: "ver",
+                type: "input",
+                message: "What do you want the datapack version to be? (This has to be a number)"
+            },
+            {
+                name: "locationtype",
+                type: "list",
+                message: "Create datapack in local directory or choose from your saves (windows only)",
+                choices: ["Local directory", "Choose from my saves"]
+            }
+        ]
+    )
+    name = __1.name
+    desc = __1.desc
+    try {
+        version = JSON.parse(__1.ver)
+    } catch (error) {
+        console.log(`! Version value entered not a number, exiting...`.red.bold);
+        process.exit()
     }
-
-    // Are you sure?
-    var issure = await sure(answers.DATAPACKNAME, answers.DATAPACKDESC, answers.DATAPACKVERN, location);
-    var {
-        SURE
-    } = issure;
-
-    // Make the datapack
-    if (issure.SURE == "Yes") {
-        createDataPack(answers.DATAPACKNAME, answers.DATAPACKDESC, answers.DATAPACKVERN, location);
+    if (__1.locationtype == 'Local directory') {
+        location = `${process.cwd()}/${name}`
     } else {
-        console.log(`\n\n\n`);
+        var saveslist = shell.ls(minecraftsaveslocation);
+        for (let i = 0; i < saveslist.length; i++) {
+            if (saveslist[i].match(/.*\..*/)) {
+                saveslist.splice(i, 1);
+            }
+        }
+        var __2 = await inquirer.prompt([{
+            name: "location",
+            type: "list",
+            message: "In witch save do you want to create the datapack?",
+            choices: saveslist
+        }]);
+        var location = `${minecraftsaveslocation}/${__2.location}/datapacks/${name}`
     }
-};
-
-if (process.platform == 'win32') {
-    run();
-} else {
-    console.log(`You need to be on windows for this generator to function properly!`.bold.red)
+    __3 = await inquirer.prompt([{
+        name: "sure",
+        type: "list",
+        message: `\n\n  Please review these options:\n\nPack name: ${name}\nPack description: ${desc}\nPack version: ${version}\nPack directory: ${location.replace(/\\/g, '/')}\n\n  Is this correct?`,
+        choices: ["Yes", "No"]
+    }]);
+    if(__3.sure == 'Yes'){
+        var temploc = location.replace(/\\/g, '/').match(/.*(?=\/)/)
+        shell.cd(temploc)
+        return {
+            "name": name,
+            "description": desc,
+            "version": version,
+            "location": shell.pwd().stdout
+        }
+    } else {
+        return 'exit'
+    }
 }
+
+// run
+(async () => {
+    var datapack = await askQuestions();
+    if(datapack == 'exit'){
+        console.log(`\n\n`);
+        process.exit()
+    } else {
+        createDataPack(datapack.name, datapack.description, datapack.version, datapack.location)
+    }
+})();
